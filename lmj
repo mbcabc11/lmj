@@ -1,1 +1,766 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[4]:
+
+
+from tkinter import *
+from time import sleep 
+from threading import *
+import tkinter
+from tkinter import ttk
+import tkinter as tk
+import threading
+from tkinter import messagebox
+import pandas as pd
+from selenium import webdriver
+from tkinter import filedialog
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+import chromedriver_autoinstaller
+from time import sleep
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys 
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import random
+from datetime import datetime
+from emoji import core
+
+# Create Object
+window = Tk()
+window.title("블로그 자동업로드 매크로")
+window.geometry('800x380')
+menubar = Menu(window)
+window.config(menu= menubar)
+subMenu = Menu(menubar, tearoff=0)
+
+def threading():
+    if que_b_count.get() == '':
+        messagebox.showwarning("경고", "블로그 탐지 최소값을 입력하세요.")
+    elif stay_min.get() == '' or stay_max.get() == '':
+        messagebox.showwarning("경고", "체류 시간 최소-최대값을 입력하세요.")        
+    elif img_min.get() == '' or img_max.get() == '':
+        messagebox.showwarning("경고", "구글 이미지 개수의 최소-최대값을 입력하세요.")           
+    elif tran1.get() == '선택':
+        messagebox.showwarning("경고", "기본/번역/재번역 여부를 선택하세요.")
+    elif lag1.get() == '선택':
+        messagebox.showwarning("경고", "이미지/영상을 선택하세요.")
+    elif lag2.get() == '선택':
+        messagebox.showwarning("경고", "계정순서를 선택하세요.")   
+    elif tran1.get() == '기본' and tran2.get() != '선택':
+        messagebox.showwarning("경고", "번역선택 오류 \n(제목 포함 여부를 선택으로 바꿔주세요.)")
+    elif tran1.get() == '기본' and tran3.get() != '선택':
+        messagebox.showwarning("경고", "번역선택 오류 \n(언어를 선택으로 바꿔주세요.)")
+    elif tran1.get() != '기본' and tran2.get() == '선택':
+        messagebox.showwarning("경고", "번역선택 오류 \n(제목포함 및 미포함을 선택하세요.)")
+    elif tran1.get() != '기본' and tran3.get() == '선택':
+        messagebox.showwarning("경고", "번역선택 오류 \n(번역하실 언어를 선택하세요.)")
+    else:
+        t1=Thread(target=work)
+        t1.start()
+    
+def browse_file():
+    global filename
+    filename = filedialog.askopenfilename()
+    if filename == '':
+        messagebox.showwarning("경고", "파일을 추가 하세요") 
+menubar.add_cascade(label="File", menu =subMenu)
+subMenu.add_command(label="Open", command=browse_file)
+
+def work():
+    option = Options()
+    option.add_argument('--incognito')
+    chrome_ver = chromedriver_autoinstaller.get_chrome_version().split('.')[0]
+    try:
+        driver = webdriver.Chrome(f'./{chrome_ver}/chromedriver.exe', options=option)
+    except:
+        chromedriver_autoinstaller.install(True)
+    df = pd.read_excel(filename,sheet_name='키워드')
+    if lag2.get() == '순차적 업로드':
+        log=0
+    while True:
+        try:
+            driver = webdriver.Chrome(f'./{chrome_ver}/chromedriver.exe', options=option)
+            keyword = df['키워드']
+            g = keyword.count()
+            key = random.randint(1,g)
+            kw = str(keyword[key])
+            site='https://search.naver.com/search.naver?ssc=tab.blog.all&sm=tab_jum&query='+kw+''
+            driver.get(site)
+            driver.implicitly_wait(10)
+
+            n=1
+            while True:
+                try:
+                    #ELEMENT = driver.find_element(By.XPATH,'/html/body/div[3]/div[2]/div/div[1]/section/html-persist/div/more-contents/div/ul/li['+str(n)+']')   23.10.20 네이버 검색안됨 수정
+                    #ELEMENT = driver.find_element(By.XPATH,'/html/body/div[3]/div[2]/div/div[1]/section/more-contents/div/ul/li['+str(n)+']') 24.02.04 네이버 검색안됨 수정
+                    ELEMENT = driver.find_element(By.XPATH,'/html/body/div[3]/div[2]/div/div[1]/section/div[1]/ul/li['+str(n)+']')
+                    driver.execute_script("arguments[0].scrollIntoView(true);", ELEMENT) 
+                    driver.implicitly_wait(10)
+                    if n >= int(que_b_count.get()): # 숫자 선택
+                        break
+                    n=n+1
+                except NoSuchElementException:
+                    break   
+            a = driver.find_elements(By.CLASS_NAME,'bx')
+            blog_count = len(a)
+            x = random.randint(1, blog_count-1)
+            random_link = driver.find_element(By.XPATH,'/html/body/div[3]/div[2]/div/div[1]/section/div[1]/ul/li['+str(x)+']/div/div[1]/div[1]/a').get_attribute('data-url')
+            #random_link = driver.find_element(By.XPATH,'/html/body/div[3]/div[2]/div/div[1]/section/more-contents/div/ul/li['+str(x)+']/div/div[1]/div[1]/a').get_attribute('data-url') 24.02.04 네이버 검색안됨 수정
+            #random_link = driver.find_element(By.XPATH,'/html/body/div[3]/div[2]/div/div[1]/section/html-persist/div/more-contents/div/ul/li['+str(x)+']/div/div/a').get_attribute('href') 23.10.20 네이버 검색안됨 수정
+            driver.get(random_link)
+            driver.implicitly_wait(30)
+            title =[]
+            iframes = driver.find_elements(By.TAG_NAME,'iframe')
+            driver.switch_to.frame(iframes[0])
+            soup = BeautifulSoup(driver.page_source, 'html.parser')
+            for i in soup:
+                ti = i.select_one('div.se-module.se-module-text.se-title-text').get_text()
+                ti = ti.replace('\n','')
+                ti_result= core.replace_emoji(ti, replace ='')
+                title.append(ti_result)
+                se = i.select_one('div.se-main-container').get_text()
+                se_result= core.replace_emoji(se, replace ='')
+                se_result = se_result.replace('\u200b','')
+                sentence1 = se_result.split('\n\n\n\n\n')
+                sentence1 = list(filter(None, sentence1))
+                while " "in sentence1:
+                    sentence1.remove(" ")
+            sentence =[]        
+            for i in sentence1:
+                temp = i.replace('\n','')
+                sentence.append(temp)
+            sleep(1)
+            #제목 번역 여부
+
+            tilte_sentence = []
+            tilte_tran_sentence =[]
+            tran_sentence = []
+            tran_tran_sentence =[]
+            if tran3.get() == '영어':
+                tran_site ='https://papago.naver.com/?sk=auto&tk=en'
+                driver.get(tran_site)
+                driver.implicitly_wait(30)   #23.7.26 네이버번역 xpath 변경 수정
+                if tran1.get() == '번역':
+                    if tran2.get() == '포함':
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').send_keys(title[0])                           #왼쪽칸 xpath
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[4]/div/button').click()                                           #번역버튼 xpath
+                        element = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div')))  #오른쪽칸 xpath
+                        sleep(1.5)
+                        tran_ti = driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div').text
+                        tilte_sentence.append(tran_ti)
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').clear()
+                    i=0
+                    while i<len(sentence):
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').send_keys(sentence[i])
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[4]/div/button').click()
+                        element = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div')))
+                        sleep(1.5)
+                        tran_sen = driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div').text
+                        tran_sentence.append(tran_sen)
+                        tran_sentence = list(set(tran_sentence)) 
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').clear()
+                        sleep(1.5)
+                        i=i+1
+                elif tran1.get() == '재번역':
+                    if tran2.get() == '포함':
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').send_keys(title[0])
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[4]/div/button').click()
+                        element = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div')))
+                        sleep(1.5)
+                        tran_ti = driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div').text
+                        tilte_sentence.append(tran_ti)
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').clear()
+                    i=0
+                    while i<len(sentence):
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').send_keys(sentence[i])
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[4]/div/button').click()
+                        element = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div')))
+                        sleep(1.5)
+                        tran_sen = driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div').text
+                        tran_sentence.append(tran_sen)
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').clear()
+                        sleep(1.5)
+                        i=i+1
+                    driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[2]/button').click()  #번역 변경키
+                    sleep(1)
+                    driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').clear()
+                    sleep(1)
+                    if tran2.get() == '포함':
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').send_keys(tilte_sentence[0])
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[4]/div/button').click()
+                        element = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div')))
+                        sleep(1.5)
+                        tran_ti = driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div').text
+                        tilte_tran_sentence.append(tran_ti)
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').clear()
+                    sleep(1)
+                    i=0
+                    while i<len(tran_sentence):
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').send_keys(tran_sentence[i])
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[4]/div/button').click()
+                        element = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div')))
+                        sleep(1.5)
+                        tran_sen = driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div').text
+                        tran_tran_sentence.append(tran_sen)
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').clear()
+                        sleep(1.5)
+                        i=i+1            
+            elif tran3.get() == '일본어':
+                tran_site ='https://papago.naver.com/?sk=auto&tk=ja'
+                driver.get(tran_site)
+                driver.implicitly_wait(30)
+                if tran1.get() == '번역':
+                    if tran2.get() == '포함':
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').send_keys(title[0])
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[4]/div/button').click()
+                        element = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div')))
+                        sleep(1.5)
+                        tran_ti = driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div').text
+                        tilte_sentence.append(tran_ti)
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').clear()
+                    i=0
+                    while i<len(sentence):
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').send_keys(sentence[i])
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[4]/div/button').click()
+                        element = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div')))
+                        sleep(1.5)
+                        tran_sen = driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div').text
+                        tran_sentence.append(tran_sen)
+                        tran_sentence = list(set(tran_sentence)) 
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').clear()
+                        sleep(1.5)
+                        i=i+1
+                elif tran1.get() == '재번역':
+                    if tran2.get() == '포함':
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').send_keys(title[0])
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[4]/div/button').click()
+                        element = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div')))
+                        sleep(1.5)
+                        tran_ti = driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div').text
+                        tilte_sentence.append(tran_ti)
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').clear()
+                    i=0
+                    while i<len(sentence):
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').send_keys(sentence[i])
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[4]/div/button').click()
+                        element = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div')))
+                        sleep(1.5)
+                        tran_sen = driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div').text
+                        tran_sentence.append(tran_sen)
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').clear()
+                        sleep(1.5)
+                        i=i+1
+                    driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[2]/button').click()    #번역 변경키
+                    sleep(1)
+                    driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').clear()
+                    sleep(1)
+                    if tran2.get() == '포함':
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').send_keys(tilte_sentence[0])
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[4]/div/button').click()
+                        element = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div')))
+                        sleep(1.5)
+                        tran_ti = driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div').text
+                        tilte_tran_sentence.append(tran_ti)
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').clear()
+                    sleep(1)
+                    i=0
+                    while i<len(tran_sentence):
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').send_keys(tran_sentence[i])
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[4]/div/button').click()
+                        element = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div')))
+                        sleep(1.5)
+                        tran_sen = driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[3]/div/div[5]/div').text
+                        tran_tran_sentence.append(tran_sen)
+                        driver.find_element(By.XPATH,'/html/body/div/div/div[1]/section/div/div[1]/div[2]/div/div[3]/label/textarea').clear()
+                        sleep(1.5)
+                        i=i+1  
+            elif tran1.get() == '기본' and tran2.get() == '선택' and tran3.get() == '선택':
+                pass
+
+            # 제목
+            if tran1.get() == '번역' and tran2.get() == '포함':
+                ti_list = tilte_sentence
+            elif tran1.get() == '재번역' and tran2.get() == '포함':
+                ti_list = tilte_tran_sentence
+            elif tran1.get() == '기본' and tran2.get() == '포함':
+                ti_list = title
+            else:
+                ti_list = title            
+            video_link = []
+            j=2
+            im_vo = str(random.randint(1, 2))
+            if lag1.get() == '이미지만':   # ti_list[0]   23.6.13 ysh 구글 이미지 검색 시 타이틀이 아닌 키워드로 검색하게 수정
+                site_img = 'https://www.google.com/search?q='+kw+'&tbm=isch&ved=2ahUKEwjOm8XAk5n7AhVgwIsBHV2YDGIQ2-cCegQIABAA&oq=%EA%B5%AC%EA%B8%80&gs_lcp=CgNpbWcQAzIICAAQgAQQsQMyCAgAEIAEELEDMggIABCABBCxAzIFCAAQgAQyBQgAEIAEMgUIABCABDIICAAQgAQQsQMyBQgAEIAEMgUIABCABDIFCAAQgARQuQtY5Cdg0yhoAXAAeAGAAWWIAdUEkgEDNi4xmAEAoAEBqgELZ3dzLXdpei1pbWewAQDAAQE&sclient=img&ei=UHJnY86zMOCAr7wP3bCykAY&bih=1247&biw=1249&hl=ko'
+                driver.get(site_img)   
+                driver.implicitly_wait(30)
+                go_img = driver.find_elements(By.CSS_SELECTOR,'.rg_i.Q4LuWd')
+                img_count = len(go_img)
+                img_link = []
+                g = random.randint(int(img_min.get()), int(img_max.get())) # 개수 랜덤지정
+                while True:
+                    try:
+                        if img_count<g:
+                            if j==img_count+2:
+                                break                            
+                            driver.find_element(By.CSS_SELECTOR,'#islrg > div.islrc > div:nth-child('+str(j)+') > a.FRuiCf.islib.nfEiy').click()  #23.9.22 구글이미지 못땀 수정
+                            sleep(1.5)
+                            html = driver.page_source
+                            soup = BeautifulSoup(html, 'html.parser')
+                            for i in soup:
+                                lk = i.select_one('img.sFlh5c.pT0Scc.iPVvYb').attrs['src']   #23.10.15 재수정(이미지 못땀) 23.4.27 ysh 구글이미지 못땀 수정 
+                            img_link.append(lk)
+
+                        else: 
+                            if j>g+2:
+                                break
+                            driver.find_element(By.CSS_SELECTOR,'#islrg > div.islrc > div:nth-child('+str(j)+') > a.FRuiCf.islib.nfEiy').click()  #23.9.22 구글이미지 못땀 수정
+                            sleep(1.5)
+                            html = driver.page_source
+                            soup = BeautifulSoup(html, 'html.parser')
+                            for i in soup:
+                                lk = i.select_one('img.sFlh5c.pT0Scc.iPVvYb').attrs['src']   #23.10.15 재수정(이미지 못땀) 23.4.27 ysh 구글이미지 못땀 수정 
+                            img_link.append(lk)
+
+                        j=j+1
+                    except:
+                        j=j+1
+                        pass
+            elif lag1.get() == '이미지&영상':   # ti_list[0]   23.7.14 ysh 구글 이미지 검색 시 타이틀이 아닌 키워드로 검색하게 수정
+                site_img = 'https://www.google.com/search?q='+kw+'&tbm=isch&ved=2ahUKEwjOm8XAk5n7AhVgwIsBHV2YDGIQ2-cCegQIABAA&oq=%EA%B5%AC%EA%B8%80&gs_lcp=CgNpbWcQAzIICAAQgAQQsQMyCAgAEIAEELEDMggIABCABBCxAzIFCAAQgAQyBQgAEIAEMgUIABCABDIICAAQgAQQsQMyBQgAEIAEMgUIABCABDIFCAAQgARQuQtY5Cdg0yhoAXAAeAGAAWWIAdUEkgEDNi4xmAEAoAEBqgELZ3dzLXdpei1pbWewAQDAAQE&sclient=img&ei=UHJnY86zMOCAr7wP3bCykAY&bih=1247&biw=1249&hl=ko'
+                driver.get(site_img)   
+                driver.implicitly_wait(30)
+                go_img = driver.find_elements(By.CSS_SELECTOR,'.rg_i.Q4LuWd')
+                img_count = len(go_img)
+                img_link = []
+                g = random.randint(int(img_min.get()), int(img_max.get()))  # 개수 랜덤지정
+                while True:
+                    try:
+                        if img_count<g:
+                            if j==img_count+2:
+                                break                            
+                            driver.find_element(By.CSS_SELECTOR,'#islrg > div.islrc > div:nth-child('+str(j)+') > a.FRuiCf.islib.nfEiy').click()  #23.9.22 구글이미지 못땀 수정
+                            sleep(1.5)
+                            html = driver.page_source
+                            soup = BeautifulSoup(html, 'html.parser')
+                            for i in soup:
+                                lk = i.select_one('img.sFlh5c.pT0Scc.iPVvYb').attrs['src']   #23.10.15 재수정(이미지 못땀) 23.4.27 ysh 구글이미지 못땀 수정 
+                            img_link.append(lk) 
+
+                        else: 
+                            if j>g+2:
+                                break
+                            driver.find_element(By.CSS_SELECTOR,'#islrg > div.islrc > div:nth-child('+str(j)+') > a.FRuiCf.islib.nfEiy').click()  #23.9.22 구글이미지 못땀 수정
+                            sleep(1.5)
+                            html = driver.page_source
+                            soup = BeautifulSoup(html, 'html.parser')
+                            for i in soup:
+                                lk = i.select_one('img.sFlh5c.pT0Scc.iPVvYb').attrs['src']   #23.10.15 재수정(이미지 못땀) 23.4.27 ysh 구글이미지 못땀 수정 
+                            img_link.append(lk) 
+
+                        j=j+1
+                    except:
+                        j=j+1
+                        pass
+                # 유튜브 영상가져오기 
+                site_video ='https://www.youtube.com/results?search_query='+ti_list[0]
+                driver.get(site_video) 
+                driver.implicitly_wait(30)
+                video = driver.find_element(By.XPATH,'/html/body/ytd-app/div[1]/ytd-page-manager/ytd-search/div[1]/ytd-two-column-search-results-renderer/div/ytd-section-list-renderer/div[2]/ytd-item-section-renderer/div[3]/ytd-video-renderer[1]/div[1]/ytd-thumbnail/a').get_attribute('href')
+                video_link.append(video)
+            elif lag1.get() == '랜덤(이미지/이미지&영상)':   # ti_list[0]   23.7.14 ysh 구글 이미지 검색 시 타이틀이 아닌 키워드로 검색하게 수정
+                if im_vo == '1':
+                    site_img = 'https://www.google.com/search?q='+kw+'&tbm=isch&ved=2ahUKEwjOm8XAk5n7AhVgwIsBHV2YDGIQ2-cCegQIABAA&oq=%EA%B5%AC%EA%B8%80&gs_lcp=CgNpbWcQAzIICAAQgAQQsQMyCAgAEIAEELEDMggIABCABBCxAzIFCAAQgAQyBQgAEIAEMgUIABCABDIICAAQgAQQsQMyBQgAEIAEMgUIABCABDIFCAAQgARQuQtY5Cdg0yhoAXAAeAGAAWWIAdUEkgEDNi4xmAEAoAEBqgELZ3dzLXdpei1pbWewAQDAAQE&sclient=img&ei=UHJnY86zMOCAr7wP3bCykAY&bih=1247&biw=1249&hl=ko'
+                    driver.get(site_img)   
+                    driver.implicitly_wait(30)
+
+                    go_img = driver.find_elements(By.CSS_SELECTOR,'.rg_i.Q4LuWd')
+                    img_count = len(go_img)
+                    img_link = []
+                    g = random.randint(int(img_min.get()), int(img_max.get()))  # 개수 랜덤지정
+                    while True:
+                        try:
+                            if img_count<g:
+                                if j==img_count+2:
+                                    break                            
+                                driver.find_element(By.CSS_SELECTOR,'#islrg > div.islrc > div:nth-child('+str(j)+') > a.FRuiCf.islib.nfEiy').click()  #23.9.22 구글이미지 못땀 수정
+                                sleep(1.5)
+                                html = driver.page_source
+                                soup = BeautifulSoup(html, 'html.parser')
+                                for i in soup:
+                                    lk = i.select_one('img.sFlh5c.pT0Scc.iPVvYb').attrs['src']   #23.10.15 재수정(이미지 못땀) 23.4.27 ysh 구글이미지 못땀 수정 
+                                img_link.append(lk) 
+
+                            else: 
+                                if j>g+2:
+                                    break
+                                driver.find_element(By.CSS_SELECTOR,'#islrg > div.islrc > div:nth-child('+str(j)+') > a.FRuiCf.islib.nfEiy').click()  #23.9.22 구글이미지 못땀 수정
+                                sleep(1.5)
+                                html = driver.page_source
+                                soup = BeautifulSoup(html, 'html.parser')
+                                for i in soup:
+                                    lk = i.select_one('img.sFlh5c.pT0Scc.iPVvYb').attrs['src']   #23.10.15 재수정(이미지 못땀) 23.4.27 ysh 구글이미지 못땀 수정 
+                                img_link.append(lk) 
+
+                            j=j+1
+                        except:
+                            j=j+1
+                            pass
+                elif im_vo == '2':   # ti_list[0]   23.7.14 ysh 구글 이미지 검색 시 타이틀이 아닌 키워드로 검색하게 수정
+                    site_img = 'https://www.google.com/search?q='+kw+'&tbm=isch&ved=2ahUKEwjOm8XAk5n7AhVgwIsBHV2YDGIQ2-cCegQIABAA&oq=%EA%B5%AC%EA%B8%80&gs_lcp=CgNpbWcQAzIICAAQgAQQsQMyCAgAEIAEELEDMggIABCABBCxAzIFCAAQgAQyBQgAEIAEMgUIABCABDIICAAQgAQQsQMyBQgAEIAEMgUIABCABDIFCAAQgARQuQtY5Cdg0yhoAXAAeAGAAWWIAdUEkgEDNi4xmAEAoAEBqgELZ3dzLXdpei1pbWewAQDAAQE&sclient=img&ei=UHJnY86zMOCAr7wP3bCykAY&bih=1247&biw=1249&hl=ko'
+                    driver.get(site_img)   
+                    driver.implicitly_wait(30)
+                    go_img = driver.find_elements(By.CSS_SELECTOR,'.rg_i.Q4LuWd')
+                    img_count = len(go_img)
+                    img_link = []
+                    g = random.randint(int(img_min.get()), int(img_max.get()))  # 개수 랜덤지정
+                    while True:
+                        try:
+                            if img_count<g:
+                                if j==img_count+2:
+                                    break                            
+                                driver.find_element(By.CSS_SELECTOR,'#islrg > div.islrc > div:nth-child('+str(j)+') > a.FRuiCf.islib.nfEiy').click()  #23.9.22 구글이미지 못땀 수정
+                                sleep(1.5)
+                                html = driver.page_source
+                                soup = BeautifulSoup(html, 'html.parser')
+                                for i in soup:
+                                    lk = i.select_one('img.sFlh5c.pT0Scc.iPVvYb').attrs['src']   #23.10.15 재수정(이미지 못땀) 23.4.27 ysh 구글이미지 못땀 수정 
+                                img_link.append(lk) 
+
+                            else: 
+                                if j>g+2:
+                                    break
+                                driver.find_element(By.CSS_SELECTOR,'#islrg > div.islrc > div:nth-child('+str(j)+') > a.FRuiCf.islib.nfEiy').click()  #23.9.22 구글이미지 못땀 수정
+                                sleep(1.5)
+                                html = driver.page_source
+                                soup = BeautifulSoup(html, 'html.parser')
+                                for i in soup:
+                                    lk = i.select_one('img.sFlh5c.pT0Scc.iPVvYb').attrs['src']   #23.10.15 재수정(이미지 못땀) 23.4.27 ysh 구글이미지 못땀 수정 
+                                img_link.append(lk) 
+
+                            j=j+1
+                        except:
+                            j=j+1
+                            pass
+                    # 유튜브 영상가져오기     
+                    site_video ='https://www.youtube.com/results?search_query='+ti_list[0]
+                    driver.get(site_video) 
+                    driver.implicitly_wait(30)
+                    video = driver.find_element(By.XPATH,'/html/body/ytd-app/div[1]/ytd-page-manager/ytd-search/div[1]/ytd-two-column-search-results-renderer/div/ytd-section-list-renderer/div[2]/ytd-item-section-renderer/div[3]/ytd-video-renderer[1]/div[1]/ytd-thumbnail/a').get_attribute('href')
+                    video_link.append(video)
+
+            # 블로그 삽입
+            df2 = pd.read_excel(filename,sheet_name='로그인')
+            blog_site = df2['링크']
+            blog_id = df2['아이디']
+            blog_pa = df2['비밀번호']
+            blog_count = blog_site.count()
+
+            if tran1.get() == '번역':
+                sen_list = tran_sentence
+            elif tran1.get() == '재번역':
+                sen_list = tran_tran_sentence
+            elif tran1.get() == '기본':
+                sen_list = sentence
+
+            if lag2.get() == '순차적 업로드':
+                bs = str(blog_site[log])
+                bi = str(blog_id[log])
+                bp = str(blog_pa[log])
+                driver.get(bs)
+                driver.implicitly_wait(10)
+                
+                try:
+                    sleep(1.5)
+                    driver.find_element(By.XPATH,'/html/body/div[1]/form/p[1]/input').send_keys(bi)
+                    sleep(1.5)
+                    driver.find_element(By.XPATH,'/html/body/div[1]/form/div/div/input').send_keys(bp)
+                    driver.find_element(By.XPATH,'/html/body/div[1]/form/p[3]/input[1]').click()
+                    driver.implicitly_wait(10)
+                except:
+                    pass
+                driver.get(bs)
+                driver.implicitly_wait(10)
+
+                # 제목
+                driver.find_element(By.CSS_SELECTOR,'#content-tmce').click()
+                driver.find_element(By.CSS_SELECTOR,'#title').clear()
+                sleep(1)
+                driver.find_element(By.CSS_SELECTOR,'#title').send_keys(ti_list[0])
+                iframes = driver.find_elements(By.TAG_NAME,'iframe')
+                driver.switch_to.frame(iframes[0])
+                k=0
+                sen_count = len(sen_list)
+                lmg_count = len(img_link)
+                count = max(sen_count,lmg_count)
+                # 문단 및 이미지, 동영상 넣기
+                while k<count:
+                    if k>=lmg_count:
+                        sleep(1.5)
+                        driver.find_element(By.XPATH,'/html/body').send_keys(sen_list[k])
+                        sleep(1.5)
+                    elif k>=sen_count:
+                        driver.switch_to.window(driver.window_handles[0])
+                        driver.find_element(By.CSS_SELECTOR,'#insert-media-button').click()
+                        driver.find_element(By.CSS_SELECTOR,'#menu-item-embed').click()
+                        driver.find_element(By.CSS_SELECTOR,'#embed-url-field').clear()
+                        sleep(1.5)
+                        driver.find_element(By.CSS_SELECTOR,'#embed-url-field').send_keys(img_link[k])
+                        sleep(1.5)
+                        driver.find_element(By.CSS_SELECTOR,'#__wp-uploader-id-0 > div.media-frame-toolbar > div > div.media-toolbar-primary.search-form > button').click()
+                        iframes = driver.find_elements(By.TAG_NAME,'iframe')
+                        driver.switch_to.frame(iframes[0])
+                        driver.find_element(By.XPATH,'/html/body').send_keys(Keys.ENTER)
+                    else:
+                        driver.find_element(By.XPATH,'/html/body').send_keys(sen_list[k])
+                        driver.find_element(By.XPATH,'/html/body').send_keys(Keys.ENTER)
+                        driver.switch_to.window(driver.window_handles[0])
+                        driver.switch_to.window(driver.window_handles[0])
+                        driver.find_element(By.CSS_SELECTOR,'#insert-media-button').click()
+                        driver.find_element(By.CSS_SELECTOR,'#menu-item-embed').click()
+                        driver.find_element(By.CSS_SELECTOR,'#embed-url-field').clear()
+                        sleep(1.5)
+                        driver.find_element(By.CSS_SELECTOR,'#embed-url-field').send_keys(img_link[k])
+                        sleep(1.5)
+                        driver.find_element(By.CSS_SELECTOR,'#__wp-uploader-id-0 > div.media-frame-toolbar > div > div.media-toolbar-primary.search-form > button').click()
+                        iframes = driver.find_elements(By.TAG_NAME,'iframe')
+                        driver.switch_to.frame(iframes[0])
+                        driver.find_element(By.XPATH,'/html/body').send_keys(Keys.ENTER)
+                    k=k+1
+                driver.switch_to.window(driver.window_handles[0])
+                if lag1.get() == '이미지&영상' or len(video_link) != 0:
+                    driver.find_element(By.CSS_SELECTOR,'#insert-media-button').click()
+                    driver.find_element(By.CSS_SELECTOR,'#menu-item-embed').click()
+                    driver.find_element(By.CSS_SELECTOR,'#embed-url-field').clear()
+                    driver.find_element(By.CSS_SELECTOR,'#embed-url-field').send_keys(video_link[0])
+                    sleep(1)
+                    driver.find_element(By.CSS_SELECTOR,'#__wp-uploader-id-0 > div.media-frame-toolbar > div > div.media-toolbar-primary.search-form > button').click()
+                log=log+1
+                if log == blog_count:
+                    log=0
+                driver.switch_to.window(driver.window_handles[0])
+                driver.execute_script("window.scrollTo(0,0)")
+                sleep(1.5)
+                driver.find_element(By.XPATH,'//*[@id="publish"]').click()
+                driver.implicitly_wait(30) 
+                sleep(10)
+                now = datetime.now()
+                list_box.insert(END,now)
+                list_box.insert(END,kw+ ' ' +bs)
+                driver.close()
+                stay = random.randint(int(stay_min.get()), int(stay_max.get()))
+                sleep(int(stay))
+
+            elif lag2.get() == '랜덤 업로드':
+                log = random.randint(0, blog_count-1)
+                bs = str(blog_site[log])
+                bi = str(blog_id[log])
+                bp = str(blog_pa[log])
+                driver.get(bs)
+                driver.implicitly_wait(10)
+                try:
+                    sleep(1.5)
+                    driver.find_element(By.XPATH,'/html/body/div[1]/form/p[1]/input').send_keys(bi)
+                    sleep(1.5)
+                    driver.find_element(By.XPATH,'/html/body/div[1]/form/div/div/input').send_keys(bp)
+                    driver.find_element(By.XPATH,'/html/body/div[1]/form/p[3]/input[1]').click()
+                    driver.implicitly_wait(10)
+                except:
+                    pass
+                driver.get(bs)
+                driver.implicitly_wait(10)
+
+                 # 제목
+                driver.find_element(By.CSS_SELECTOR,'#content-tmce').click()
+                driver.find_element(By.CSS_SELECTOR,'#title').clear()
+                sleep(1)
+                driver.find_element(By.CSS_SELECTOR,'#title').send_keys(ti_list[0])
+                iframes = driver.find_elements(By.TAG_NAME,'iframe')
+                driver.switch_to.frame(iframes[0])
+                k=0
+                sen_count = len(sen_list)
+                lmg_count = len(img_link)
+                count = max(sen_count,lmg_count)
+                # 문단 및 이미지, 동영상 넣기
+                while k<count:
+                    try:
+                        if k>=lmg_count:
+                            sleep(1.5)
+                            driver.find_element(By.XPATH,'/html/body').send_keys(sen_list[k])
+                            sleep(1.5)
+                        elif k>=sen_count:
+                            driver.switch_to.window(driver.window_handles[0])
+                            driver.find_element(By.CSS_SELECTOR,'#insert-media-button').click()
+                            driver.find_element(By.CSS_SELECTOR,'#menu-item-embed').click()
+                            driver.find_element(By.CSS_SELECTOR,'#embed-url-field').clear()
+                            sleep(1.5)
+                            driver.find_element(By.CSS_SELECTOR,'#embed-url-field').send_keys(img_link[k])
+                            sleep(1.5)
+                            driver.find_element(By.CSS_SELECTOR,'#__wp-uploader-id-0 > div.media-frame-toolbar > div > div.media-toolbar-primary.search-form > button').click()
+                            iframes = driver.find_elements(By.TAG_NAME,'iframe')
+                            driver.switch_to.frame(iframes[0])
+                            driver.find_element(By.XPATH,'/html/body').send_keys(Keys.ENTER)
+                        else:
+                            driver.find_element(By.XPATH,'/html/body').send_keys(sen_list[k])
+                            driver.find_element(By.XPATH,'/html/body').send_keys(Keys.ENTER)
+                            sleep(2)
+                            driver.switch_to.window(driver.window_handles[0])
+                            driver.switch_to.window(driver.window_handles[0])
+                            driver.find_element(By.CSS_SELECTOR,'#insert-media-button').click()
+                            driver.find_element(By.CSS_SELECTOR,'#menu-item-embed').click()
+                            driver.find_element(By.CSS_SELECTOR,'#embed-url-field').clear()
+                            sleep(1.5)
+                            driver.find_element(By.CSS_SELECTOR,'#embed-url-field').send_keys(img_link[k])
+                            sleep(1.5)
+                            driver.find_element(By.CSS_SELECTOR,'#__wp-uploader-id-0 > div.media-frame-toolbar > div > div.media-toolbar-primary.search-form > button').click()
+                            iframes = driver.find_elements(By.TAG_NAME,'iframe')
+                            driver.switch_to.frame(iframes[0])
+                            driver.find_element(By.XPATH,'/html/body').send_keys(Keys.ENTER)
+                        k=k+1
+                    except:
+                        break
+                driver.switch_to.window(driver.window_handles[0])
+                if lag1.get() == '이미지&영상' or len(video_link) != 0:
+                    driver.find_element(By.CSS_SELECTOR,'#insert-media-button').click()
+                    driver.find_element(By.CSS_SELECTOR,'#menu-item-embed').click()
+                    driver.find_element(By.CSS_SELECTOR,'#embed-url-field').clear()
+                    driver.find_element(By.CSS_SELECTOR,'#embed-url-field').send_keys(video_link[0])
+                    sleep(2)
+                    driver.find_element(By.CSS_SELECTOR,'#__wp-uploader-id-0 > div.media-frame-toolbar > div > div.media-toolbar-primary.search-form > button').click()
+                driver.switch_to.window(driver.window_handles[0])
+                driver.execute_script("window.scrollTo(0,0)")
+                sleep(1.5)
+                driver.find_element(By.XPATH,'//*[@id="publish"]').click()
+                driver.implicitly_wait(30) 
+                sleep(10)
+                now = datetime.now()
+                list_box.insert(END,now)
+                list_box.insert(END,kw+ ' ' +bs)
+                driver.close()
+                stay = random.randint(int(stay_min.get()), int(stay_max.get()))
+                sleep(int(stay))
+        except:
+            try:
+                driver.close()
+            except:
+                pass
+            sleep(3)
+            pass
+
+frame_not= ttk.LabelFrame(window, text = '기본 선택')
+frame_not.place(x = 20,y = 10)
+
+label = ttk.Label(frame_not, text="블로그 탐지 최소값 : ")
+label.grid(column=0, row=0,padx=3,pady=3)
+que_b_count = tkinter.StringVar()
+textbox = ttk.Entry(frame_not, width=5, textvariable = que_b_count)
+textbox.grid(column=1, row=0,padx=3,pady=3)
+
+label = ttk.Label(frame_not, text="체류시간(최소~최대) : ")
+label.grid(column=0, row=1,padx=3,pady=3)
+stay_min = tkinter.StringVar()
+textbox = ttk.Entry(frame_not, width=5, textvariable = stay_min)
+textbox.grid(column=1, row=1,padx=3,pady=3)
+
+label = ttk.Label(frame_not, text="~")
+label.grid(column=2, row=1,padx=3,pady=3)
+stay_max = tkinter.StringVar()
+textbox = ttk.Entry(frame_not, width=5, textvariable = stay_max)
+textbox.grid(column=3, row=1,padx=3,pady=3)
+
+label = ttk.Label(frame_not, text="이미지개수(최소~최대) : ")
+label.grid(column=0, row=2,padx=0,pady=3)
+img_min = tkinter.StringVar()
+textbox = ttk.Entry(frame_not, width=5, textvariable = img_min)
+textbox.grid(column=1, row=2,padx=0,pady=3)
+
+label = ttk.Label(frame_not, text="~")
+label.grid(column=2, row=2,padx=0,pady=3)
+img_max = tkinter.StringVar()
+textbox = ttk.Entry(frame_not, width=5, textvariable = img_max)
+textbox.grid(column=3, row=2,padx=0,pady=3)
+
+
+frame_notice = ttk.LabelFrame(window, text = '번역 선택')
+frame_notice.place(x = 20,y = 120)
+
+label1 = ttk.Label(frame_notice, text="선택(기본/번역/재번역) : ")
+label1.grid(column=0, row=0,padx=3,pady=3)
+tran1 = tkinter.StringVar()
+textbox1 = ttk.Combobox(frame_notice, width=18 ,textvariable = tran1, state='readonly')
+textbox1['values'] = ('선택','기본','번역','재번역')
+textbox1.grid(column=1, row=0,padx=3,pady=3) 
+textbox1.current(0)
+
+label2 = ttk.Label(frame_notice, text="선택(제목포함/미포함) : ")
+label2.grid(column=0, row=1,padx=3,pady=3)
+tran2 = tkinter.StringVar()
+textbox2 = ttk.Combobox(frame_notice, width=18 ,textvariable = tran2, state='readonly')
+textbox2['values'] = ('선택','포함','미포함')
+textbox2.grid(column=1, row=1,padx=3,pady=3) 
+textbox2.current(0)
+
+label3 = ttk.Label(frame_notice, text="선택(언어) : ")
+label3.grid(column=0, row=2,padx=3,pady=3)
+tran3 = tkinter.StringVar()
+textbox3 = ttk.Combobox(frame_notice, width=18 ,textvariable = tran3, state='readonly')
+textbox3['values'] = ('선택','영어','일본어')
+textbox3.grid(column=1, row=2,padx=3,pady=3) 
+textbox3.current(0)
+
+frame_notice2 = ttk.LabelFrame(window, text = '이미지/영상 선택')
+frame_notice2.place(x = 20,y = 230)
+
+label4 = ttk.Label(frame_notice2, text="선택(이미지/영상) : ")
+label4.grid(column=0, row=0,padx=3,pady=3)
+lag1 = tkinter.StringVar()
+textbox4 = ttk.Combobox(frame_notice2, width=18 ,textvariable = lag1, state='readonly')
+textbox4['values'] = ('선택','이미지만','이미지&영상','랜덤(이미지/이미지&영상)')
+textbox4.grid(column=1, row=0,padx=3,pady=3) 
+textbox4.current(0)
+
+label5 = ttk.Label(frame_notice2, text="선택(계정 순서) : ")
+label5.grid(column=0, row=1,padx=3,pady=3)
+lag2 = tkinter.StringVar()
+textbox5 = ttk.Combobox(frame_notice2, width=18 ,textvariable = lag2, state='readonly')
+textbox5['values'] = ('선택','순차적 업로드','랜덤 업로드')
+textbox5.grid(column=1, row=1,padx=3,pady=3) 
+textbox5.current(0)
+
+# Button
+button = ttk.Button(window, text="매크로 실행", width = 5,command=threading)
+button.place(x = 30,y = 310,width=300, height=50)
+
+bar = Frame(window, padx=20,pady=20)
+bar.place(x = 350,y = 15)
+sbar = Scrollbar(bar) #스크롤
+sbar.pack(side='right', fill='y')
+list_box = Listbox(bar, selectmode='extended',width=55, height=17, yscrollcommand=sbar.set)
+list_box.pack(side='left')
+sbar.config(command=list_box.yview) #스크롤바
+label4 = ttk.Label(window, text="작업완료 LIST")
+label4.place(x = 370,y = 10)
+
+
+#ysh 23.7.15 램이 너무 꽉차서 다끝나고 초기화 시키는것 추가
+import gc
+data = None
+
+del data
+gc.collect()
+
+#data = None  # 또는 다른 기본값으로 초기화
+
+# 크롤링 및 데이터 가공, 업로드 작업 수행
+# 데이터를 data 변수에 저장하는 코드
+
+# 작업이 완료된 후 데이터 삭제
+#del data
+
+window.mainloop()
+
 
